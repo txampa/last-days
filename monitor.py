@@ -16,7 +16,7 @@ SCRAPECREATORS_KEY = os.environ["SCRAPECREATORS_API_KEY"]
 TELEGRAM_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
 OPENAI_KEY         = os.environ["OPENAI_API_KEY"]
-GUMROAD_URL        = "https://bravepicks.gumroad.com/l/ysrqd"
+GUMROAD_URL        = "https://bravepicks.gumroad.com/l/tnamey"
 DB_PATH            = os.environ.get("DB_PATH", "seen_posts.db")
 
 HEADERS_SC    = {"x-api-key": SCRAPECREATORS_KEY}
@@ -90,6 +90,7 @@ Write exactly 3 reply variations. Each must:
 - Feel natural and human, NOT like an ad
 - Reference something specific from the post (show you read it)
 - Include the Gumroad link organically
+- Include the word FREE (if English) or GRATIS (if Spanish) in uppercase near the link
 - NOT start with "Hey!" or "Great post!"
 - NOT use emojis excessively (max 1)
 
