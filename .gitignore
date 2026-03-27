@@ -1,0 +1,4 @@
+.env
+seen_posts.db
+__pycache__/
+*.pyc
