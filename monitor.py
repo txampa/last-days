@@ -1,7 +1,8 @@
 """
 Leak Detector Lead Monitor
-Busca posts en Reddit y TikTok sobre gasto en suscripciones.
-Genera 3 replies variados con Claude y los envía por Telegram.
+Busca posts en TikTok sobre gasto en suscripciones (1000+ views).
+Genera 3 replies variados con OpenAI y los envía por Telegram.
+Horario: 8h, 11h, 14h, 17h, 20h, 23h (hora España)
 """
 
 import os
@@ -126,20 +127,7 @@ OPTION_C: [starts with a genuine question, then offers the resource]"""
         fallback_c = f"Have you actually counted all your active subscriptions? Most people are shocked. Free tool: {GUMROAD_URL}"
         return fallback_a, fallback_b, fallback_c
 
-# ── Reddit ────────────────────────────────────────────────────────────────────
-def search_reddit(query: str) -> list:
-    try:
-        resp = requests.get(
-            "https://api.scrapecreators.com/v1/reddit/search",
-            params={"query": query, "sort": "new", "timeframe": "day"},
-            headers=HEADERS_SC,
-            timeout=20,
-        )
-        resp.raise_for_status()
-        return resp.json().get("posts", [])
-    except Exception as e:
-        print(f"[Reddit] Error: {e}")
-        return []
+MIN_VIEWS = 1000
 
 # ── TikTok ────────────────────────────────────────────────────────────────────
 def search_tiktok(query: str) -> list:
@@ -217,30 +205,18 @@ def run():
 
     for query in QUERIES:
 
-        # ── Reddit ──
-        for post in search_reddit(query):
-            post_id = str(post.get("id", post.get("reddit_id", "")))
-            if not post_id:
-                continue
-            title = post.get("title", "")
-            if not has_intent(title):
-                continue
-            uid = f"reddit_{post_id}"
-            if is_seen(conn, uid):
-                continue
-
-            replies = generate_replies("Reddit", title)
-            mark_seen(conn, uid, "reddit")
-            send_telegram(build_reddit_message(post, replies))
-            total_new += 1
-            print(f"  [Reddit] {title[:70]}".encode("ascii", "replace").decode())
-            time.sleep(1)
-
         # ── TikTok ──
         for video in search_tiktok(query):
             vid_id = str(video.get("aweme_id", ""))
             if not vid_id:
                 continue
+
+            # Filtro de views mínimas
+            stats = video.get("statistics", {})
+            views = stats.get("play_count", 0) if isinstance(stats, dict) else 0
+            if views < MIN_VIEWS:
+                continue
+
             caption = video.get("desc", "")
             if not has_intent(caption):
                 continue
@@ -252,7 +228,7 @@ def run():
             mark_seen(conn, uid, "tiktok")
             send_telegram(build_tiktok_message(video, replies))
             total_new += 1
-            print(f"  [TikTok] {caption[:70]}".encode("ascii", "replace").decode())
+            print(f"  [TikTok] {views:,}v — {caption[:60]}".encode("ascii", "replace").decode())
             time.sleep(1)
 
     conn.close()

@@ -3,4 +3,4 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "python monitor.py"
-cronSchedule = "0 * * * *"
+cronSchedule = "0 7,10,13,16,19,22 * * *"
