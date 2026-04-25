@@ -17,7 +17,7 @@ TELEGRAM_TOKEN   = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 OPENAI_KEY       = os.environ["OPENAI_API_KEY"]
 TWITTER_TOKEN    = os.environ["TWITTER_AUTH_TOKEN"]
-GUMROAD_URL      = "https://bravepicks.gumroad.com/l/tnamey"
+GUMROAD_URL      = "https://templates.bravepicks.com/templates/the-1000-leak-detector"
 DB_PATH          = os.environ.get("DB_PATH", "seen_posts.db")
 
 HEADERS_OAI = {"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"}
