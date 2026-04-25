@@ -1,47 +1,141 @@
 """
-Leak Detector Lead Monitor
-Busca posts en TikTok sobre gasto en suscripciones (1000+ views).
-Genera 3 replies variados con OpenAI y los envía por Telegram.
-Horario: 8h, 11h, 14h, 17h, 20h, 23h (hora España)
+Leak Detector Lead Monitor — Twitter Edition (Scweet)
+Busca tweets sobre: suscripciones, control financiero, monetización YouTube/TikTok.
+Solo tweets en inglés. Genera 3 replies con OpenAI y envía por Telegram.
+Horario: 7h, 10h, 13h, 16h, 19h, 22h (hora España)
 """
 
 import os
 import sqlite3
-import requests
 import time
-from datetime import datetime
+import requests
+from datetime import datetime, timedelta
+from Scweet import Scweet
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SCRAPECREATORS_KEY = os.environ["SCRAPECREATORS_API_KEY"]
-TELEGRAM_TOKEN     = os.environ["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID   = os.environ["TELEGRAM_CHAT_ID"]
-OPENAI_KEY         = os.environ["OPENAI_API_KEY"]
-GUMROAD_URL        = "https://bravepicks.gumroad.com/l/tnamey"
-DB_PATH            = os.environ.get("DB_PATH", "seen_posts.db")
+TELEGRAM_TOKEN   = os.environ["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+OPENAI_KEY       = os.environ["OPENAI_API_KEY"]
+TWITTER_TOKEN    = os.environ["TWITTER_AUTH_TOKEN"]
+GUMROAD_URL      = "https://bravepicks.gumroad.com/l/tnamey"
+DB_PATH          = os.environ.get("DB_PATH", "seen_posts.db")
 
-HEADERS_SC    = {"x-api-key": SCRAPECREATORS_KEY}
-HEADERS_OAI   = {"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"}
+HEADERS_OAI = {"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"}
 
-# ── Palabras clave ────────────────────────────────────────────────────────────
-QUERIES = [
-    "how much do you spend on subscriptions",
-    "too many subscriptions wasting money",
-    "subscription audit save money",
-    "cancel subscriptions monthly spending",
-    "subscription creep spending",
-    "forgot about subscriptions paying",
-    "cuanto gastas en suscripciones",
-    "demasiadas suscripciones ahorro",
+MIN_LIKES = 2
+SINCE     = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+# ── Topic 1: Subscription Spending ───────────────────────────────────────────
+SUBSCRIPTION_QUERIES = [
+    "too many subscriptions lang:en",
+    "subscription spending monthly lang:en",
+    "cancel subscriptions save money lang:en",
+    "forgot I was paying subscription lang:en",
+    "hidden monthly charges apps lang:en",
 ]
 
-INTENT_WORDS = [
-    "subscri", "suscri", "subscription", "suscripcion",
-    "cancel", "cancela", "unsubscri",
-    "monthly spend", "monthly cost", "monthly bill",
-    "how much do you spend", "cuanto gastas",
-    "wasting money", "saving money on",
-    "audit", "tracker", "too many apps",
+SUBSCRIPTION_INTENT = [
+    "subscri", "cancel", "monthly bill", "monthly cost", "monthly spend",
+    "wasting money", "audit", "forgot", "hidden charge", "too many apps",
+    "netflix", "spotify", "streaming", "overpaying", "money leak",
 ]
+
+SUBSCRIPTION_PROMPT = """You are helping promote a FREE spreadsheet called "The €1.000 Leak Detector" that helps people audit their monthly subscriptions and spot money leaks.
+
+Gumroad link: {gumroad_url}
+
+Tweet: "{tweet_text}"
+Author: @{username}
+
+Write exactly 3 Twitter reply variations. Each must:
+- Feel natural and human, NOT like an ad
+- Reference something specific from the tweet (show you read it)
+- Include the Gumroad link organically
+- Include the word FREE in uppercase near the link
+- NOT start with "Hey!" or "Great post!"
+- NOT use emojis excessively (max 1)
+- Be in English
+- Be under 250 characters
+
+Format EXACTLY like this (nothing else):
+OPTION_A: [short reply, 1 sentence, casual/relatable tone]
+OPTION_B: [medium reply, 2 sentences, adds a useful stat or insight]
+OPTION_C: [starts with a genuine question, then offers the resource]"""
+
+# ── Topic 2: Personal Financial Control ──────────────────────────────────────
+FINANCE_QUERIES = [
+    "personal finance budget tracker lang:en",
+    "track monthly expenses budget lang:en",
+    "money leaks personal finance lang:en",
+    "control monthly spending lang:en",
+    "financial audit personal budget lang:en",
+]
+
+FINANCE_INTENT = [
+    "budget", "expense", "tracker", "spending", "financial", "money",
+    "audit", "control", "monthly", "personal finance", "track", "save",
+    "savings", "cash flow", "money management", "bills",
+]
+
+FINANCE_PROMPT = """You are helping promote a FREE spreadsheet called "The €1.000 Leak Detector" that helps people take control of their personal finances by auditing all monthly expenses and finding hidden money leaks.
+
+Gumroad link: {gumroad_url}
+
+Tweet: "{tweet_text}"
+Author: @{username}
+
+Write exactly 3 Twitter reply variations. Each must:
+- Feel natural and human, NOT like an ad
+- Reference something specific from the tweet
+- Include the Gumroad link organically
+- Include the word FREE in uppercase near the link
+- NOT start with "Hey!" or "Great post!"
+- NOT use emojis excessively (max 1)
+- Be in English
+- Be under 250 characters
+
+Format EXACTLY like this (nothing else):
+OPTION_A: [short reply, 1 sentence, casual/relatable tone]
+OPTION_B: [medium reply, 2 sentences, adds a useful stat or insight]
+OPTION_C: [starts with a genuine question about spending habits, then offers the resource]"""
+
+# ── Topic 3: Monetize YouTube / TikTok ───────────────────────────────────────
+CREATOR_QUERIES = [
+    "how to monetize youtube channel lang:en",
+    "youtube monetization tips lang:en",
+    "tiktok monetization strategy lang:en",
+    "make money youtube channel lang:en",
+    "monetize tiktok videos creator lang:en",
+]
+
+CREATOR_INTENT = [
+    "monetize", "monetization", "youtube", "tiktok", "revenue", "earnings",
+    "adsense", "creator fund", "make money", "income from", "channel",
+    "shorts", "grow channel", "youtube income",
+]
+
+CREATOR_PROMPT = """You are helping promote a FREE spreadsheet called "The €1.000 Leak Detector" that helps content creators audit all their monthly tool subscriptions (editing software, analytics, stock footage, etc.) to reduce overhead and maximize net revenue.
+
+Gumroad link: {gumroad_url}
+
+Tweet: "{tweet_text}"
+Author: @{username}
+
+Write exactly 3 Twitter reply variations. Each must:
+- Feel natural and human, NOT like an ad
+- Connect to the creator angle: tool costs eat into revenue, knowing overhead is key to real profit
+- Reference something specific from the tweet
+- Include the Gumroad link organically
+- Include the word FREE in uppercase near the link
+- NOT start with "Hey!" or "Great post!"
+- NOT use emojis excessively (max 1)
+- Be in English
+- Be under 250 characters
+
+Format EXACTLY like this (nothing else):
+OPTION_A: [short reply, 1 sentence, casual/relatable tone]
+OPTION_B: [medium reply, 2 sentences, adds insight about creator tool costs vs revenue]
+OPTION_C: [starts with a genuine question about their tool stack, then offers the resource]"""
 
 # ── Base de datos ─────────────────────────────────────────────────────────────
 def init_db():
@@ -56,12 +150,12 @@ def init_db():
     conn.commit()
     return conn
 
-def is_seen(conn, post_id: str) -> bool:
+def is_seen(conn, post_id):
     return conn.execute(
         "SELECT 1 FROM seen WHERE post_id=?", (post_id,)
     ).fetchone() is not None
 
-def mark_seen(conn, post_id: str, platform: str):
+def mark_seen(conn, post_id, platform):
     conn.execute(
         "INSERT OR IGNORE INTO seen (post_id, platform, seen_at) VALUES (?,?,?)",
         (post_id, platform, datetime.now().isoformat())
@@ -69,36 +163,17 @@ def mark_seen(conn, post_id: str, platform: str):
     conn.commit()
 
 # ── Filtro de intención ───────────────────────────────────────────────────────
-def has_intent(text: str) -> bool:
+def has_intent(text, intent_words):
     t = text.lower()
-    return any(w in t for w in INTENT_WORDS)
+    return any(w in t for w in intent_words)
 
-# ── Claude: generar 3 replies variados ───────────────────────────────────────
-def generate_replies(platform: str, content: str) -> tuple[str, str, str]:
-    """Genera 3 replies distintos para un post dado usando OpenAI gpt-4o-mini."""
-    lang_hint = "Spanish" if any(w in content.lower() for w in ["suscri", "gastas", "ahorro", "mes"]) else "English"
-
-    prompt = f"""You are helping promote a FREE spreadsheet template called "The €1.000 Leak Detector" that helps people audit their monthly subscriptions and find hidden money leaks.
-
-Gumroad link: {GUMROAD_URL}
-
-Platform: {platform}
-Post/caption: "{content}"
-Reply language: {lang_hint}
-
-Write exactly 3 reply variations. Each must:
-- Feel natural and human, NOT like an ad
-- Reference something specific from the post (show you read it)
-- Include the Gumroad link organically
-- Include the word FREE (if English) or GRATIS (if Spanish) in uppercase near the link
-- NOT start with "Hey!" or "Great post!"
-- NOT use emojis excessively (max 1)
-
-Format your response EXACTLY like this (nothing else):
-OPTION_A: [short reply, 1 sentence, casual/relatable tone]
-OPTION_B: [medium reply, 2-3 sentences, adds a useful stat or insight]
-OPTION_C: [starts with a genuine question, then offers the resource]"""
-
+# ── OpenAI: generar 3 replies ─────────────────────────────────────────────────
+def generate_replies(prompt_template, tweet_text, username):
+    prompt = prompt_template.format(
+        gumroad_url=GUMROAD_URL,
+        tweet_text=tweet_text[:400],
+        username=username,
+    )
     try:
         resp = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -106,7 +181,7 @@ OPTION_C: [starts with a genuine question, then offers the resource]"""
             json={
                 "model": "gpt-4o-mini",
                 "max_tokens": 400,
-                "messages": [{"role": "user", "content": prompt}]
+                "messages": [{"role": "user", "content": prompt}],
             },
             timeout=20,
         )
@@ -117,37 +192,20 @@ OPTION_C: [starts with a genuine question, then offers the resource]"""
             for line in text.splitlines()
             if ": " in line and line.startswith("OPTION_")
         }
-        a = lines.get("OPTION_A", f"I found a free spreadsheet that audits exactly this: {GUMROAD_URL}")
-        b = lines.get("OPTION_B", f"Most people underestimate their subscription spend by 2-3x. Free audit: {GUMROAD_URL}")
-        c = lines.get("OPTION_C", f"Have you ever counted all your active subscriptions? Free tool: {GUMROAD_URL}")
+        a = lines.get("OPTION_A", f"Built a FREE spreadsheet that audits exactly this: {GUMROAD_URL}")
+        b = lines.get("OPTION_B", f"Most people underestimate their subscription spend by 2-3x. FREE audit: {GUMROAD_URL}")
+        c = lines.get("OPTION_C", f"Have you counted all your active subscriptions? FREE tool: {GUMROAD_URL}")
         return a, b, c
     except Exception as e:
         print(f"[OpenAI] Error: {e}")
-        fallback_a = f"Same thing happened to me — I built a free spreadsheet to audit this: {GUMROAD_URL}"
-        fallback_b = f"The average person underestimates their subscription spend by $133/month. Free audit sheet: {GUMROAD_URL}"
-        fallback_c = f"Have you actually counted all your active subscriptions? Most people are shocked. Free tool: {GUMROAD_URL}"
-        return fallback_a, fallback_b, fallback_c
-
-MIN_VIEWS = 1000
-
-# ── TikTok ────────────────────────────────────────────────────────────────────
-def search_tiktok(query: str) -> list:
-    try:
-        resp = requests.get(
-            "https://api.scrapecreators.com/v1/tiktok/search/keyword",
-            params={"query": query},
-            headers=HEADERS_SC,
-            timeout=20,
+        return (
+            f"Same thing happened to me — built a FREE spreadsheet to audit this: {GUMROAD_URL}",
+            f"The average person underestimates subscription spend by $133/month. FREE audit sheet: {GUMROAD_URL}",
+            f"Have you counted all your active subscriptions? Most people are shocked. FREE tool: {GUMROAD_URL}",
         )
-        resp.raise_for_status()
-        raw = resp.json().get("search_item_list", [])
-        return [item["aweme_info"] for item in raw if "aweme_info" in item]
-    except Exception as e:
-        print(f"[TikTok] Error: {e}")
-        return []
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
-def send_telegram(text: str):
+def send_telegram(text):
     try:
         requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
@@ -162,35 +220,15 @@ def send_telegram(text: str):
     except Exception as e:
         print(f"[Telegram] Error: {e}")
 
-# ── Mensajes Telegram ─────────────────────────────────────────────────────────
-def build_reddit_message(post: dict, replies: tuple) -> str:
-    title     = post.get("title", "")
-    subreddit = post.get("subreddit", "")
-    score     = post.get("score", post.get("ups", 0))
-    url       = post.get("url", post.get("permalink", ""))
-    if url and not url.startswith("http"):
-        url = f"https://www.reddit.com{url}"
-    a, b, c = replies
+def build_message(tweet, replies, label):
+    username = tweet["user"]["screen_name"]
+    text     = tweet["text"][:280]
+    likes    = tweet.get("likes", 0) or 0
+    url      = tweet.get("tweet_url", "")
+    a, b, c  = replies
     return (
-        f"🟠 <b>Reddit Lead</b> · r/{subreddit} · {score} pts\n"
-        f"📝 {title}\n"
-        f"🔗 {url}\n\n"
-        f"<b>A)</b> <code>{a}</code>\n\n"
-        f"<b>B)</b> <code>{b}</code>\n\n"
-        f"<b>C)</b> <code>{c}</code>"
-    )
-
-def build_tiktok_message(video: dict, replies: tuple) -> str:
-    desc   = video.get("desc", "")[:200]
-    author = video.get("author", {})
-    handle = author.get("unique_id", "") if isinstance(author, dict) else str(author)
-    stats  = video.get("statistics", {})
-    views  = stats.get("play_count", 0) if isinstance(stats, dict) else 0
-    url    = video.get("share_url", f"https://tiktok.com/@{handle}")
-    a, b, c = replies
-    return (
-        f"🎵 <b>TikTok Lead</b> · @{handle} · {views:,} views\n"
-        f"📝 {desc}\n"
+        f"🐦 <b>Twitter Lead</b> [{label}] · @{username} · ❤️ {likes}\n"
+        f"📝 {text}\n"
         f"🔗 {url}\n\n"
         f"<b>A)</b> <code>{a}</code>\n\n"
         f"<b>B)</b> <code>{b}</code>\n\n"
@@ -198,42 +236,55 @@ def build_tiktok_message(video: dict, replies: tuple) -> str:
     )
 
 # ── Motor principal ───────────────────────────────────────────────────────────
-def run():
-    conn = init_db()
-    total_new = 0
+def scan(client, conn, queries, intent_words, prompt_template, label):
+    total = 0
+    for query in queries:
+        try:
+            tweets = client.search(query, since=SINCE, limit=15, save=False) or []
+        except Exception as e:
+            print(f"[Twitter] '{query}' — Error: {e}")
+            time.sleep(5)
+            continue
 
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Iniciando busqueda...")
-
-    for query in QUERIES:
-
-        # ── TikTok ──
-        for video in search_tiktok(query):
-            vid_id = str(video.get("aweme_id", ""))
-            if not vid_id:
+        for tweet in tweets:
+            tweet_id = str(tweet.get("tweet_id", ""))
+            if not tweet_id:
                 continue
 
-            # Filtro de views mínimas
-            stats = video.get("statistics", {})
-            views = stats.get("play_count", 0) if isinstance(stats, dict) else 0
-            if views < MIN_VIEWS:
+            likes = tweet.get("likes", 0) or 0
+            if likes < MIN_LIKES:
                 continue
 
-            caption = video.get("desc", "")
-            if not has_intent(caption):
+            tweet_text = tweet.get("text", "")
+            if not has_intent(tweet_text, intent_words):
                 continue
-            uid = f"tiktok_{vid_id}"
+
+            uid = f"twitter_{tweet_id}"
             if is_seen(conn, uid):
                 continue
 
-            replies = generate_replies("TikTok", caption)
-            mark_seen(conn, uid, "tiktok")
-            send_telegram(build_tiktok_message(video, replies))
-            total_new += 1
-            print(f"  [TikTok] {views:,}v — {caption[:60]}".encode("ascii", "replace").decode())
-            time.sleep(1)
+            username = tweet["user"]["screen_name"]
+            replies  = generate_replies(prompt_template, tweet_text, username)
+            mark_seen(conn, uid, "twitter")
+            send_telegram(build_message(tweet, replies, label))
+            total += 1
+            print(f"  [{label}] @{username} likes={likes} -- {tweet_text[:60].encode('ascii','replace').decode()}")
+            time.sleep(2)
+
+        time.sleep(3)
+    return total
+
+def run():
+    conn   = init_db()
+    client = Scweet(auth_token=TWITTER_TOKEN)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Buscando tweets desde {SINCE}...")
+
+    total  = scan(client, conn, SUBSCRIPTION_QUERIES, SUBSCRIPTION_INTENT, SUBSCRIPTION_PROMPT, "Subscriptions")
+    total += scan(client, conn, FINANCE_QUERIES,      FINANCE_INTENT,      FINANCE_PROMPT,      "Finance")
+    total += scan(client, conn, CREATOR_QUERIES,      CREATOR_INTENT,      CREATOR_PROMPT,      "Creators")
 
     conn.close()
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Listo — {total_new} leads nuevos")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Listo — {total} leads nuevos")
 
 if __name__ == "__main__":
     run()
