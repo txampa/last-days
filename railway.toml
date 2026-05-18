@@ -2,5 +2,5 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python monitor.py"
-cronSchedule = "0 0 31 2 *"  # PAUSED — restore to: "0 6,12,17 * * *"
+startCommand = "echo PAUSED"
+cronSchedule = "0 0 31 2 *"  # PAUSED — restore startCommand to 'python monitor.py' and cronSchedule to '0 6,12,17 * * *'
